@@ -17,6 +17,7 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
+
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPWSTR    lpCmdLine,
@@ -121,6 +122,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
+
+// 김진형) 전역 변수
+int mouseX = 0, mouseY = 0; // 마우스 좌표
+POINT objPos = { 300, 300 }; // 오브젝트 위치
+POINT objScale = { 100, 100 }; // 오브젝트 크기
+
 //
 //  함수: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -159,12 +166,57 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // 김진형) Device Context를 만들어서 ID를 반환
             HDC hdc = BeginPaint(hWnd, &ps);
 
-            // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...
+            // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...            
+            HPEN hMyPen = CreatePen(PS_SOLID, 1, RGB(255, 0, 0)); //김진형) 직접 팬을 만들어서 DC에 넣음
+            HBRUSH hMyBrush = CreateSolidBrush(RGB(255, 0, 255)); // 김진형) 직접 브러쉬를 만들어 DC에 넣음
 
-            for(int i = 10; i < 100; i+= 10)
-                Rectangle(hdc, i, i, i * 5, i * 5);
+            HPEN hDefaultPen = (HPEN)SelectObject(hdc, hMyPen); // 김진형) 기본 펜 ID 값을 받아옴
+            HBRUSH hDefaultBrush = (HBRUSH)SelectObject(hdc, hMyBrush); // 김진형) 기본 브러쉬 ID 값을 받아옴)
+
+            //Rectangle(hdc, 10, 10, 100, 100); // 김진형) 변경된 펜으로 사각형을 그림
+            Rectangle(hdc, 
+                objPos.x - objScale.x / 2, 
+                objPos.y - objScale.y / 2, 
+                objPos.x + objScale.x / 2, 
+                objPos.y + objScale.y / 2);
+
+            SelectObject(hdc, hDefaultPen); // 김진형) DC의 펜을 원래 펜으로 되돌림
+            SelectObject(hdc, hDefaultBrush); // 김진형) DC의 브러쉬를 원래 브러쉬로 되돌림
+
+            DeleteObject(hMyPen); // 김진형) 사용된 펜 삭제 요청
+            DeleteObject(hDefaultBrush); // 김진형) 사용된 브러쉬 삭제 요청
 
             EndPaint(hWnd, &ps);
+        }
+        break;
+    case WM_KEYDOWN: //김진형) 키 입력을 통해 움직여보자
+        {
+            switch (wParam)
+            {
+                case VK_UP:
+                    objPos.y -= 5;
+                    InvalidateRect(hWnd, NULL, true);
+                    break;
+                case VK_DOWN:
+                    objPos.y += 5;
+                    InvalidateRect(hWnd, NULL, true);
+                    break;
+                case VK_LEFT:
+                    objPos.x -= 5;
+                    InvalidateRect(hWnd, NULL, true);
+                    break;
+                case VK_RIGHT:
+                    objPos.x += 5;
+                    InvalidateRect(hWnd, NULL, true);
+                    break;
+            }
+        }
+        break;
+    case WM_LBUTTONDOWN:
+        {
+            mouseX = LOWORD(lParam);
+            mouseY = HIWORD(lParam);
+            
         }
         break;
     case WM_DESTROY:

@@ -3,6 +3,9 @@
 
 #include "framework.h"
 #include "HughWinApi.h"
+#include "pch.h"
+
+#include "CCore.h"
 
 using namespace std;
 
@@ -45,6 +48,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return FALSE;
     }
 
+    // 김진형) Core 생성 후 초기화
+    if (FAILED(CCore::GetInstance()->init(mainHwnd, POINT{ 1920, 1080 })))
+    {
+        MessageBox(nullptr, L"Core 객체 초기화 실패", L"Error", MB_OK);
+        return FALSE;
+    }
+
+
     // 김진형) LoadAccelerator는 윈도우에서 제공하는 단축키 모드다.
     // 김진형) 게임에선 메시지를 거치지 않고 실시간으로 바로 키 입력을 받을거기에 우선 패스
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_HUGHWINAPI));
@@ -65,15 +76,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // 김진형) PeekMessage는 메시지 유무와 상관없이 항상 반환하는데
     // 김진형) 메시지 큐에서 메시지를 확인한 경우 true, 메시지 큐에 메시지가 없는 경우 false 반환
 
-    DWORD prevCnt = GetTickCount64();
-    DWORD stkCnt = 0; //누적된 시간
-
-    
     while (true)
     {
         if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) // 메시지가 있는 경우 호출
         {
-            int mssCnt = GetTickCount64(); //메시지 처리한 시간
             if (msg.message == WM_QUIT)
                 break;
 
@@ -84,24 +90,13 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
             }
-            int difTime = GetTickCount64() - mssCnt;
-            stkCnt += difTime;
         }
         else // 메시지가 없는 경우 호출
         {
-            DWORD curCnt = GetTickCount64();
-            if (1000 < prevCnt - curCnt) // 1초가 지난경우
-            {
-                float timeRatio = (float)stkCnt / 1000.0f; // 누적 시간대바 얼마나 흘렀는 지
-                wchar_t szBuff[50] = {};
-                swprintf_s(szBuff, L"비율 : %f", timeRatio);
-                SetWindowText(mainHwnd, szBuff);
-
-                prevCnt = curCnt;
-            }
+            // 김진형) Game 관련 클라이언트 코드 처리
+            CCore::GetInstance()->progress();
         }
-    }
-    
+    }  
 
     //KillTimer(mainHwnd, 10);
     return (int) msg.wParam;
@@ -168,21 +163,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 #include <vector>
 
-// 김진형) 전역 변수
-//int mouseX = 0, mouseY = 0; // 마우스 좌표
 
-struct objInfo
-{
-    POINT objPos; // 오브젝트 위치
-    POINT objScale; // 오브젝트 크기
-};
-
-POINT leftTop; // 좌상단 위치
-POINT rightBtm; // 우하단 위치
-
-vector<objInfo> objInfoVec; // objInfo 구조체 담을 vector
-
-bool lBtnDown = false; // 마우스 좌클릭인지 아닌지
 
 //
 //  함수: WndProc(HWND, UINT, WPARAM, LPARAM)
@@ -222,100 +203,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             // 김진형) Device Context를 만들어서 ID를 반환
             HDC hdc = BeginPaint(hWnd, &ps);
 
-            // TODO: 여기에 hdc를 사용하는 그리기 코드를 추가합니다...            
-            HPEN hMyPen = CreatePen(PS_SOLID, 1, RGB(0, 0, 0)); //김진형) 직접 팬을 만들어서 DC에 넣음
-            HBRUSH hMyBrush = CreateSolidBrush(RGB(255, 255, 0)); // 김진형) 직접 브러쉬를 만들어 DC에 넣음
-
-            HPEN hDefaultPen = (HPEN)SelectObject(hdc, hMyPen); // 김진형) 기본 펜 ID 값을 받아옴
-            HBRUSH hDefaultBrush = (HBRUSH)SelectObject(hdc, hMyBrush); // 김진형) 기본 브러쉬 ID 값을 받아옴)
-
-            //Rectangle(hdc, 10, 10, 100, 100); // 김진형) 변경된 펜으로 사각형을 그림
-
-            // 마우스 좌클릭시 그려줌
-            if (lBtnDown)
-            {
-                Rectangle(hdc, leftTop.x, leftTop.y, rightBtm.x, rightBtm.y);
-            }
-
-            for (size_t i = 0; i < objInfoVec.size(); i++)
-            {
-                Rectangle(hdc,
-                    objInfoVec[i].objPos.x - objInfoVec[i].objScale.x / 2,
-                    objInfoVec[i].objPos.y - objInfoVec[i].objScale.y / 2,
-                    objInfoVec[i].objPos.x + objInfoVec[i].objScale.x / 2,
-                    objInfoVec[i].objPos.y + objInfoVec[i].objScale.y / 2);
-            }
-
-            SelectObject(hdc, hDefaultPen); // 김진형) DC의 펜을 원래 펜으로 되돌림
-            SelectObject(hdc, hDefaultBrush); // 김진형) DC의 브러쉬를 원래 브러쉬로 되돌림
-
-            DeleteObject(hMyPen); // 김진형) 사용된 펜 삭제 요청
-            DeleteObject(hDefaultBrush); // 김진형) 사용된 브러쉬 삭제 요청
-
             EndPaint(hWnd, &ps);
         }
         break;
     case WM_KEYDOWN: //김진형) 키 입력을 통해 움직여보자
         {
-            switch (wParam)
-            {
-                case VK_UP:
-                    //objPos.y -= 5;
-                    InvalidateRect(hWnd, NULL, true);
-                    break;
-                case VK_DOWN:
-                    //objPos.y += 5;
-                    InvalidateRect(hWnd, NULL, true);
-                    break;
-                case VK_LEFT:
-                    //objPos.x -= 5;
-                    InvalidateRect(hWnd, NULL, true);
-                    break;
-                case VK_RIGHT:
-                    //objPos.x += 5;
-                    InvalidateRect(hWnd, NULL, true);
-                    break;
-            }
+      
         }
         break;
     case WM_LBUTTONDOWN: //마우스 좌클릭 시
         {
-            //mouseX = LOWORD(lParam);
-            //mouseY = HIWORD(lParam);
-            
-            //좌클릭 시작점의 마우스 좌표를 받아온다.
-            leftTop.x = LOWORD(lParam);
-            leftTop.y = HIWORD(lParam);
-
-            lBtnDown = true;
         }
         break;
     case WM_LBUTTONUP: //마우스 좌클릭 뗐을 때
         {
-            //해당 위치에서 오브젝트 그리기
-            objInfo info = { };
-            info.objPos.x = (leftTop.x + rightBtm.x) / 2;
-            info.objPos.y = (leftTop.y + rightBtm.y) / 2;
 
-            info.objScale.x = abs(leftTop.x - rightBtm.x);
-            info.objScale.y = abs(leftTop.y - rightBtm.y);
-
-            objInfoVec.push_back(info);
-
-            lBtnDown = false;
-            InvalidateRect(hWnd, NULL, true);
         }
         break;
     case WM_MOUSEMOVE: //마우스 이동시
-        {
-            //마우스 우 하단의 좌표를 받아온다.
-            rightBtm.x = LOWORD(lParam);
-            rightBtm.y = HIWORD(lParam);
-            //InvalidateRect(hWnd, NULL, true); //무효화 영역 실행하여 그려줌을 갱신
-        }
         break;
     case WM_TIMER:
-        // SetTimer 함수의 마지막 인자는 여기서 처리된다.
         break;
     case WM_DESTROY:
         PostQuitMessage(0);

@@ -83,13 +83,9 @@ private:
 public:
 	int init(HWND _hwnd, POINT _resolution); // main에서 윈도우 메인 핸들러와 해상도 받아 초기화
 	void progress(); // 실제 계속해서 처리할 함수
-
+	HWND GetMainHwnd() { return c_hwnd; }
 private:
 	void update();
 	void render();
-
-private:
-	CCore();
-	~CCore();
 };
 

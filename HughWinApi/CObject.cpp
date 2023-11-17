@@ -3,8 +3,8 @@
 
 CObject::CObject()
 {
-	m_pos = {};
-	m_scale = {};
+	mPos = {};
+	mScale = {};
 }
 
 CObject::~CObject()

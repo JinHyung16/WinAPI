@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "CCore.h"
 #include "CObject.h"
-
+#include "CTimeMgr.h"
 // CCore* CCore::core = nullptr;
 
 CObject cObj;
@@ -30,8 +30,11 @@ int CCore::init(HWND _hwnd, POINT _resolution)
 	SetWindowPos(c_hwnd, nullptr, 100, 100, rt.right - rt.left, rt.bottom - rt.top, 0);
 	c_hdc = GetDC(c_hwnd);
 
-	cObj.m_pos = POINT{ c_ptResolution.x / 2, c_ptResolution.y / 2 };
-	cObj.m_scale = POINT{ 100, 100 };
+	// Manager Init
+	CTimeMgr::GetInstance()->init();
+
+	cObj.SetPos(Vector2((float)(c_ptResolution.x / 2), (float)(c_ptResolution.y / 2)));
+	cObj.SetScale(Vector2(100, 100));
 
 	return S_OK; // pch.h의 S_OK 의미
 }
@@ -45,21 +48,29 @@ void CCore::progress()
 
 void CCore::update()
 {
+	// Manager Update
+	CTimeMgr::GetInstance()->update();
+
+	Vector2 curPos = cObj.GetPos();
 	// 비트 연산해서 0x8000 자리에 있다면 true 반환
 	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
 	{
-		cObj.m_pos.x -= 1;
+		curPos.x -= 100.0f * fDeltaTime
 	}
 	if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
 	{
-		cObj.m_pos.x += 1;
+		curPos.x += 100.0f * fDeltaTime;
 	}
+	cObj.SetPos(curPos);
 }
 
 void CCore::render()
 {
-	Rectangle(c_hdc, cObj.m_pos.x - cObj.m_scale.x / 2, 
-		cObj.m_pos.y - cObj.m_scale.y / 2, 
-		cObj.m_pos.x + cObj.m_scale.x / 2, 
-		cObj.m_pos.y + cObj.m_scale.y / 2);
+	Vector2 curPos = cObj.GetPos();
+	Vector2 curScale = cObj.GetScale();
+
+	Rectangle(c_hdc, int(curPos.x - curScale.x / 2.0f),
+		int(curPos.y - curScale.y / 2.0f),
+		int(curPos.x + curScale.x / 2.0f),
+		int(curPos.y + curScale.y / 2.0f));
 }
